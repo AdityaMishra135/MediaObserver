@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">MediaObserver</string>
+    <string name="take_a_screenshot_to_test">Take a ScreenShot to test</string>
+    <string name="developed_by_sohaib">Developed by Sohaib</string>
+</resources>
