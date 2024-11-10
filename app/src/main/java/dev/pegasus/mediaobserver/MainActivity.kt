@@ -1,11 +1,8 @@
 package dev.pegasus.mediaobserver
 
-import android.database.ContentObserver
+import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.provider.MediaStore
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.textview.MaterialTextView
 import dev.pegasus.mediaobserver.observers.MediaContentObserver
@@ -25,7 +22,6 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         mediaContentObserver.register()
-        initContentObserver()
     }
 
     override fun onPause() {
@@ -34,53 +30,40 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun initContentObserver() {
-        mediaContentObserver = MediaContentObserver(contentResolver) {
+        mediaContentObserver = MediaContentObserver(contentResolver) { uri ->
             // Changes have been detected
-            changeObserved()
+            changeObserved(uri)
         }
     }
 
-    private fun changeObserved() {
+    private fun changeObserved(uri: Uri?) {
         counter++
-        val text = "MediaStore has been updated ($counter) time/s"
-        
-        // Display change notification
-        findViewById<MaterialTextView>(R.id.mtv_title).text = text
-        Toast.makeText(this, text, Toast.LENGTH_SHORT).show()
+        val text = "MediaStore has been updated ($counter) time(s)"
 
-        // Fetch details of recent changes
-        getRecentMediaChanges()
+        findViewById<MaterialTextView>(R.id.mtv_title).text = text
+
+        // Fetch details of the changed media item
+        uri?.let {
+            getMediaDetails(it)
+        }
     }
 
-    private fun getRecentMediaChanges() {
+    private fun getMediaDetails(uri: Uri) {
         val projection = arrayOf(
             MediaStore.Files.FileColumns.DISPLAY_NAME,
             MediaStore.Files.FileColumns.DATA,
             MediaStore.Files.FileColumns.DATE_ADDED
         )
 
-        val selection = "${MediaStore.Files.FileColumns.DATE_ADDED} >= ?"
-        val oneMinuteAgo = (System.currentTimeMillis() / 1000) - 60
-        val selectionArgs = arrayOf(oneMinuteAgo.toString())
+        contentResolver.query(uri, projection, null, null, null)?.use { cursor ->
+            if (cursor.moveToFirst()) {
+                val fileName = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DISPLAY_NAME))
+                val filePath = cursor.getString(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATA))
+                val dateAdded = cursor.getLong(cursor.getColumnIndexOrThrow(MediaStore.Files.FileColumns.DATE_ADDED))
 
-        val cursor = contentResolver.query(
-            MediaStore.Files.getContentUri("external"),
-            projection,
-            selection,
-            selectionArgs,
-            "${MediaStore.Files.FileColumns.DATE_ADDED} DESC"
-        )
-
-        cursor?.use {
-            val nameIndex = cursor.getColumnIndex(MediaStore.Files.FileColumns.DISPLAY_NAME)
-            val pathIndex = cursor.getColumnIndex(MediaStore.Files.FileColumns.DATA)
-
-            while (cursor.moveToNext()) {
-                val fileName = cursor.getString(nameIndex)
-                val filePath = cursor.getString(pathIndex)
-
-                // Show file path and name in Toast or log it
-                Toast.makeText(this, "File Added: $fileName\nPath: $filePath", Toast.LENGTH_SHORT).show()
+                // Set details to a TextView
+                val detailsTextView = findViewById<MaterialTextView>(R.id.mtv_details)
+                detailsTextView.text = "File Name: $fileName\nPath: $filePath\nDate Added: $dateAdded"
             }
         }
     }
